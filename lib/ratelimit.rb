@@ -1,8 +1,9 @@
+# frozen_string_literal: true
+
 require 'redis'
 require 'redis-namespace'
 
 class Ratelimit
-
   # Create a Ratelimit object.
   #
   # @param [String] key A name to uniquely identify this rate limit. For example, 'emails'
@@ -13,22 +14,23 @@ class Ratelimit
   # @option options [Redis]   :redis (nil) Redis client if you need to customize connection options
   #
   # @return [Ratelimit] Ratelimit instance
-  #
   def initialize(key, options = {})
     @key = key
     unless options.is_a?(Hash)
-      raise ArgumentError.new("Redis object is now passed in via the options hash - options[:redis]")
+      raise ArgumentError, 'Redis object is now passed in via the options hash - options[:redis]'
     end
+
     @bucket_span = options[:bucket_span] || 600
     @bucket_interval = options[:bucket_interval] || 5
+
     @bucket_expiry = options[:bucket_expiry] || @bucket_span
     if @bucket_expiry > @bucket_span
-      raise ArgumentError.new("Bucket expiry cannot be larger than the bucket span")
+      raise ArgumentError, 'Bucket expiry cannot be larger than the bucket span'
     end
+
     @bucket_count = (@bucket_span / @bucket_interval).round
-    if @bucket_count < 3
-      raise ArgumentError.new("Cannot have less than 3 buckets")
-    end
+    raise ArgumentError, 'Cannot have less than 3 buckets' if @bucket_count < 3
+
     @raw_redis = options[:redis]
   end
 
@@ -62,7 +64,8 @@ class Ratelimit
     keys = (0..count - 1).map do |i|
       (bucket - i) % @bucket_count
     end
-    return redis.hmget(subject, *keys).inject(0) {|a, i| a + i.to_i}
+
+    redis.hmget(subject, *keys).inject(0) { |a, i| a + i.to_i }
   end
 
   # Check if the rate limit has been exceeded.
@@ -72,7 +75,7 @@ class Ratelimit
   # @option options [Integer] :interval How far back to retrieve activity.
   # @option options [Integer] :threshold Maximum number of actions
   def exceeded?(subject, options = {})
-    return count(subject, options[:interval]) >= options[:threshold]
+    count(subject, options[:interval]) >= options[:threshold]
   end
 
   # Check if the rate limit is within bounds
