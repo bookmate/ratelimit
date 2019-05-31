@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'redis'
-require 'redis-namespace'
 
 class Ratelimit
   # Create a Ratelimit object.
@@ -42,7 +41,7 @@ class Ratelimit
   # @return [Integer] The counter value
   def add(subject, count = 1)
     bucket = get_bucket
-    subject = "#{@key}:#{subject}"
+    subject = subject_key(subject)
     redis.multi do
       redis.hincrby(subject, bucket, count)
       redis.hdel(subject, (bucket + 1) % @bucket_count)
@@ -59,7 +58,7 @@ class Ratelimit
     bucket = get_bucket
     interval = [[interval, @bucket_interval].max, @bucket_span].min
     count = (interval / @bucket_interval).floor
-    subject = "#{@key}:#{subject}"
+    subject = subject_key(subject)
 
     keys = (0..count - 1).map do |i|
       (bucket - i) % @bucket_count
@@ -117,7 +116,11 @@ class Ratelimit
     ((time % @bucket_span) / @bucket_interval).floor
   end
 
+  def subject_key(subject)
+    "ratelimit:#{@key}:#{subject}"
+  end
+
   def redis
-    @redis ||= Redis::Namespace.new(:ratelimit, redis: @raw_redis || Redis.new)
+    @redis ||= @raw_redis || Redis.new
   end
 end
